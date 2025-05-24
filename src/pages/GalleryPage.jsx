@@ -1,4 +1,3 @@
-// GalleryPage.jsx
 import { useEffect, useState } from "react";
 import PageWrapper from "../components/PageWrapper";
 
@@ -24,7 +23,8 @@ const GalleryPage = () => {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("webtoons")) || [];
-    setWebtoons(saved);
+    const sortedSaved = saved.sort((a, b) => a.id - b.id);
+    setWebtoons(sortedSaved);
   }, []);
 
   const handleDeleteConfirm = () => {
@@ -43,11 +43,30 @@ const GalleryPage = () => {
     return dateStr === today ? `오늘 (${time})` : `${dateStr} ${time}`;
   };
 
-  const displayed = [...webtoons]
-    .filter((item) =>
+  const formatGroupDateHeader = (iso) => {
+    const date = new Date(iso);
+    const today = new Date().toISOString().split("T")[0];
+    const dateStr = date.toISOString().split("T")[0];
+    return dateStr === today ? `오늘` : `${dateStr}`;  };
+
+  const displayed = (() => {
+    const filtered = webtoons.filter(item =>
       filterEmotion === "전체" ? true : item.emotion?.includes(filterEmotion)
-    )
-    .sort((a, b) => (sortOrder === "desc" ? b.id - a.id : a.id - b.id));
+    );
+
+    const grouped = filtered.reduce((acc, item) => {
+      const dateKey = item.date.split("T")[0];
+      if (!acc[dateKey]) acc[dateKey] = [];
+      acc[dateKey].push(item);
+      return acc;
+    }, {});
+
+    return Object.keys(grouped)
+      .map(dateKey => ({ date: dateKey, items: grouped[dateKey] }))
+      .sort((groupA, groupB) =>
+        sortOrder === "desc" ? new Date(groupB.date) - new Date(groupA.date) : new Date(groupA.date) - new Date(groupB.date)
+      );
+  })();
 
   return (
     <PageWrapper>
@@ -57,7 +76,6 @@ const GalleryPage = () => {
         📚 나의 감정 웹툰 갤러리
       </h1>
 
-      {/* 필터 & 정렬 */}
       <div
         style={{
           display: "flex",
@@ -101,70 +119,78 @@ const GalleryPage = () => {
         </select>
       </div>
 
-      {/* 카드 목록 */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile
-            ? "1fr 1fr"
-            : "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: "16px",
-          justifyContent: "center",
-        }}
-      >
-        {displayed.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => setSelectedItem(item)}
-            style={{
-              padding: "10px",
-              border: "1px solid #ddd",
-              borderRadius: "12px",
-              backgroundColor: "#fff",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-              cursor: "pointer",
-              position: "relative",
-              transition: "transform 0.2s",
-            }}
-          >
-            <img
-              src={item.image}
-              alt="웹툰 썸네일"
+      {displayed.length > 0 ? (
+        displayed.map(({ date, items }) => (
+          <div key={date}>
+            <h2 style={{ margin: '24px 0 12px 4px', fontSize: '18px', color: '#333' }}>
+              {formatGroupDateHeader(date)}
+            </h2>
+            <div
               style={{
-                width: "100%",
-                height: "140px",
-                objectFit: "cover",
-                borderRadius: "8px",
-                marginBottom: "10px",
-              }}
-            />
-            <p style={{ fontSize: "12px", color: "#888" }}>
-              {formatDate(item.date)}
-            </p>
-            <p style={{ fontSize: "12px", color: "#444" }}>{item.emotion}</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setToDelete(item);
-              }}
-              style={{
-                position: "absolute",
-                top: "6px",
-                right: "6px",
-                background: "none",
-                border: "none",
-                fontSize: "14px",
-                color: "#888",
-                cursor: "pointer",
+                display: "grid",
+                gridTemplateColumns: isMobile
+                  ? "1fr 1fr"
+                  : "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "16px",
               }}
             >
-              ✖
-            </button>
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedItem(item)}
+                  style={{
+                    padding: "10px",
+                    border: "1px solid #ddd",
+                    borderRadius: "12px",
+                    backgroundColor: "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+                    cursor: "pointer",
+                    position: "relative",
+                    transition: "transform 0.2s",
+                  }}
+                >
+                  <img
+                    src={item.image}
+                    alt="웹툰 썸네일"
+                    style={{
+                      width: "100%",
+                      height: "140px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                      marginBottom: "10px",
+                    }}
+                  />
+                  <p style={{ fontSize: "12px", color: "#888" }}>
+                    {formatDate(item.date)}
+                  </p>
+                  <p style={{ fontSize: "12px", color: "#444", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.emotion}</p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setToDelete(item);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: "6px",
+                      right: "6px",
+                      background: "none",
+                      border: "none",
+                      fontSize: "14px",
+                      color: "#888",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✖
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
+        ))
+      ) : (
+        <p style={{ textAlign: 'center', marginTop: '30px', color: '#777' }}>표시할 웹툰이 없습니다. 일기를 작성하고 웹툰을 만들어보세요!</p>
+      )}
 
-      {/* 상세 모달 */}
       {selectedItem && (
         <div onClick={() => setSelectedItem(null)} style={modalBgStyle}>
           <div
@@ -231,7 +257,6 @@ const GalleryPage = () => {
         </div>
       )}
 
-      {/* 삭제 모달 */}
       {toDelete && (
         <div onClick={() => setToDelete(null)} style={modalBgStyle}>
           <div
