@@ -6,6 +6,8 @@ import WebtoonPage from "../pages/WebtoonPage";
 import CustomizationPage from "../pages/CustomizationPage";
 import GalleryPage from "../pages/GalleryPage";
 import StatsPage from "../pages/StatsPage";
+import SignUp from "../pages/Signuppage";
+
 
 const AppRoutes = () => (
   <Routes>
@@ -16,6 +18,7 @@ const AppRoutes = () => (
     <Route path="/customize" element={<CustomizationPage />} />
     <Route path="/gallery" element={<GalleryPage />} />
     <Route path="/stats" element={<StatsPage />} />
+    <Route path="/SignUp" element={<SignUp />} /> 
   </Routes>
 );
 
