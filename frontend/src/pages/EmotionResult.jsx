@@ -1,171 +1,175 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import PageWrapper from "../components/PageWrapper";
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import '../styles/Result.css';
 
-const EmotionResult = () => {
+const Result = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const inputText = location.state?.inputText || "";
+  const { analysis, story, characterData, diaryText } = location.state || {};
 
-  const [emotion, setEmotion] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [summary, setSummary] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false); // 웹툰 생성 중 상태 추가
-
-  const emotionEmojiMap = {
-    기쁨: "😄",
-    슬픔: "😢",
-    분노: "😠",
-    불안: "😨",
-    중립: "😐",
-  };
-
+  // useEffect로 네비게이션 처리
   useEffect(() => {
-    if (!inputText) {
-      navigate("/input");
-      return;
+    if (!analysis) {
+      navigate('/');
     }
+  }, [analysis, navigate]);
 
-    const fetchEmotionAndSummary = async () => {
-      try {
-        // 1. 감정 분석
-        const resEmotion = await fetch("/api/emotion", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: inputText }),
-        });
-        const emotionData = await resEmotion.json();
-        setEmotion(emotionData.emotion);
-        setEmoji(emotionEmojiMap[emotionData.emotion] || "❓");
-
-        // 2. 텍스트 요약
-        const resSummary = await fetch("/api/summarize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: inputText }),
-        });
-        const summaryData = await resSummary.json();
-        setSummary(summaryData.summary);
-
-        setLoading(false);
-      } catch (error) {
-        console.error("API 호출 오류:", error);
-        setLoading(false);
-      }
-    };
-
-    fetchEmotionAndSummary();
-  }, [inputText, navigate]);
-
-  const handleGenerateWebtoon = async () => {
-    setGenerating(true);
-    
-    try {
-      // 3. 웹툰 생성 (버튼 클릭 시에만)
-      console.log("=== 웹툰 생성 시작 ===");
-      console.log("inputText:", inputText);
-      console.log("emotion:", emotion);
-      console.log("summary:", summary);
-
-      const resCuts = await fetch("/api/generate_4cuts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: inputText, emotion: emotion }),
-      });
-
-      if (!resCuts.ok) {
-        console.error("❌ GPT 호출 실패", resCuts.status);
-        alert("웹툰 생성에 실패했습니다. 다시 시도해주세요.");
-        setGenerating(false);
-        return;
-      }
-
-      const cutsData = await resCuts.json();
-
-      if (cutsData.error) {
-        console.error("❌ GPT 응답 에러:", cutsData.error);
-        alert("웹툰 생성 중 오류가 발생했습니다: " + cutsData.error);
-        setGenerating(false);
-        return;
-      }
-
-      console.log("✅ GPT 결과:", cutsData);
-      console.log("📦 응답 키:", Object.keys(cutsData));
-      
-      // 웹툰 페이지로 이동
-      navigate("/webtoon", {
-        state: {
-          inputText,
-          emotion,
-          summary,
-          cuts: cutsData,
-        },
-      });
-    } catch (error) {
-      console.error("웹툰 생성 오류:", error);
-      alert("웹툰 생성 중 오류가 발생했습니다.");
-      setGenerating(false);
-    }
-  };
-
-  if (loading) {
+  // analysis가 없으면 로딩 표시
+  if (!analysis) {
     return (
-      <PageWrapper>
-        <div style={{ textAlign: "center", marginTop: "100px" }}>
-          <div style={{ fontSize: "24px" }}>감정 분석 중...</div>
-        </div>
-      </PageWrapper>
+      <div className="result-container">
+        <p>분석 결과를 불러오는 중...</p>
+      </div>
     );
   }
 
-  return (
-    <PageWrapper>
-      <div style={{ textAlign: "center" }}>
-        <h1 style={{ fontSize: "24px", marginBottom: "20px" }}>
-          오늘의 감정 결과
-        </h1>
+  // 감정에 따른 색상 테마
+  const emotionColors = {
+    '기쁨': '#FFF9E6',
+    '슬픔': '#E6F3FF',
+    '분노': '#FFE6E6',
+    '불안': '#F3E6FF',
+    '평온': '#E6FFE6'
+  };
 
-        <div style={{ fontSize: "80px", marginBottom: "10px" }}>{emoji}</div>
-        <div style={{ fontSize: "18px", marginBottom: "30px", color: "#555" }}>
-          {emotion}
+  // 감정 이모지
+  const emotionEmojis = {
+    '기쁨': '😊',
+    '슬픔': '😢',
+    '분노': '😡',
+    '불안': '😰',
+    '평온': '😌'
+  };
+
+  const bgColor = emotionColors[analysis.emotion] || '#F8F9FA';
+  const emoji = emotionEmojis[analysis.emotion] || '🙂';
+
+  return (
+    <div className="result-container" style={{ backgroundColor: bgColor }}>
+      <div className="result-header">
+        <h1 className="result-title">오늘의 감정 분석 결과 ✨</h1>
+        <p className="result-date">{new Date().toLocaleDateString('ko-KR')}</p>
+      </div>
+      
+      {/* 감정 분석 결과 */}
+      <div className="emotion-card">
+        <div className="emotion-main">
+          <div className="emotion-emoji">{emoji}</div>
+          <h2 className="emotion-name">{analysis.emotion}</h2>
+          <div className="emotion-intensity">
+            감정 강도: {analysis.emotion_intensity}/10
+            <div className="intensity-bar">
+              <div 
+                className="intensity-fill"
+                style={{ 
+                  width: `${analysis.emotion_intensity * 10}%`,
+                  backgroundColor: emotionColors[analysis.emotion] 
+                }}
+              />
+            </div>
+          </div>
         </div>
 
-        <h2 style={{ fontSize: "18px", marginBottom: "10px" }}>📘 요약</h2>
-        <p
-          style={{
-            padding: "20px",
-            border: "1px solid #ddd",
-            borderRadius: "10px",
-            backgroundColor: "#fafafa",
-            whiteSpace: "pre-line",
-            fontSize: "16px",
-            maxWidth: "600px",
-            margin: "0 auto",
-          }}
-        >
-          {summary || "요약 중..."}
-        </p>
+        {analysis.sub_emotions?.length > 0 && (
+          <div className="sub-emotions">
+            <span className="detail-label">부가 감정:</span>
+            {analysis.sub_emotions.map((emotion, idx) => (
+              <span key={idx} className="sub-emotion-tag">{emotion}</span>
+            ))}
+          </div>
+        )}
 
-        <button
-          onClick={handleGenerateWebtoon}
-          disabled={generating || !emotion || !summary}
-          style={{
-            marginTop: "30px",
-            padding: "12px 20px",
-            fontSize: "16px",
-            backgroundColor: generating ? "#ccc" : "#007bff",
-            color: "#fff",
-            border: "none",
-            borderRadius: "10px",
-            cursor: generating ? "not-allowed" : "pointer",
-          }}
+        {analysis.one_line && (
+          <p className="one-line-summary">"{analysis.one_line}"</p>
+        )}
+      </div>
+
+      {/* 오늘의 요약 */}
+      <div className="summary-card">
+        <h3 className="summary-title">오늘의 요약</h3>
+        <p className="summary-text">{analysis.summary}</p>
+        
+        {analysis.keywords?.length > 0 && (
+          <div className="keyword-list">
+            {analysis.keywords.map((keyword, idx) => (
+              <span key={idx} className="keyword-tag">#{keyword}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 웹툰 스토리 */}
+      {story?.panels && story.panels.length > 0 && (
+        <div className="webtoon-section">
+          <h2 className="section-title">오늘의 웹툰 🎨</h2>
+          <div className="webtoon-panels">
+            {story.panels.map((panel, idx) => (
+              <div key={idx} className="panel-card">
+                <div className="panel-header">
+                  <span className="panel-number">#{idx + 1}</span>
+                </div>
+                {panel.image_url ? (
+                  <div className="panel-image-container">
+                    <img 
+                      src={panel.image_url} 
+                      alt={`Panel ${idx + 1}`}
+                      className="panel-image"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'block';
+                      }}
+                    />
+                    <div className="panel-placeholder" style={{ display: 'none' }}>
+                      <p>{panel.scene}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="panel-placeholder">
+                    <p>{panel.scene}</p>
+                  </div>
+                )}
+                {panel.dialogue && (
+                  <p className="panel-dialogue">💬 "{panel.dialogue}"</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 원본 일기 */}
+      {diaryText && (
+        <details className="original-diary">
+          <summary>📝 원본 일기 보기</summary>
+          <div className="diary-content">
+            <p>{diaryText}</p>
+          </div>
+        </details>
+      )}
+
+      {/* 버튼 그룹 */}
+      <div className="action-buttons">
+        <button 
+          onClick={() => navigate('/')} 
+          className="action-button secondary-button"
         >
-          {generating ? "🔄 웹툰 생성 중..." : "📚 웹툰 생성하러 가기"}
+          🏠 홈으로
+        </button>
+        <button 
+          onClick={() => navigate('/gallery')} 
+          className="action-button primary-button"
+        >
+          🖼️ 갤러리 보기
+        </button>
+        <button 
+          onClick={() => navigate('/emotion-input')} 
+          className="action-button secondary-button"
+        >
+          ✏️ 다시 작성
         </button>
       </div>
-    </PageWrapper>
+    </div>
   );
 };
 
-export default EmotionResult;
+export default Result;

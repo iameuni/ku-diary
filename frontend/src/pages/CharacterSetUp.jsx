@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageWrapper from "../components/PageWrapper";
@@ -37,15 +38,23 @@ const CharacterSetUp = () => {
           중요: 동일한 캐릭터의 다른 표정
         `;
 
-        const response = await fetch("/api/generate_character", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            prompt,
-            emotion,
-            baseDescription: textDescription
+        const response = await fetch('/api/generate_character', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            emotion: emotion,
+            character_description: textDescription
           }),
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('서버 응답:', errorText);
+          throw new Error(`서버 에러: ${response.status}`);
+        }
 
         const data = await response.json();
         if (data.url) {
