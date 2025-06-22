@@ -1,0 +1,18 @@
+{
+  "6YsP19kDbnf7ZuszKfb5LYFKaFL2": {
+    "description": "20대 여성 , 긴 갈색 머리를 묶은 포니테일 \n큰 눈과 둥근 얼굴형\n분홍색 후드티와 청바지\n안경 착용 \n밝고 활발한 느낌",
+    "images": {
+      "기쁨": "/static/character_images/character_anonymous_20250623_005255_기쁨_20250623_005256_52680bdd.png",
+      "슬픔": "/static/character_images/character_anonymous_20250623_005313_슬픔_20250623_005316_b5a702ad.png",
+      "분노": "/static/character_images/character_anonymous_20250623_005333_분노_20250623_005336_7bbb7ab5.png",
+      "불안": "/static/character_images/character_anonymous_20250623_005357_불안_20250623_005359_273a196c.png",
+      "중립": "/static/character_images/character_anonymous_20250623_005420_중립_20250623_005425_8bb35e6e.png"
+    },
+    "createdAt": "2025-06-22T15:54:27.421Z",
+    "method": "text",
+    "userId": "6YsP19kDbnf7ZuszKfb5LYFKaFL2",
+    "emotionCount": 5,
+    "version": "legacy_import",
+    "created_at": "2025-06-23T00:54:27.779265"
+  }
+}
