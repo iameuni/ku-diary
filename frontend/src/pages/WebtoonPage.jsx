@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PageWrapper from "../components/PageWrapper";
 
-import image1 from "../assets/image/image1.png";
-import image2 from "../assets/image/image2.png";
-import image3 from "../assets/image/image3.png";
-import image4 from "../assets/image/image4.png";
+// 기본 이미지들을 placeholder로 대체 (assets 이미지가 삭제된 경우)
+const image1 = "https://via.placeholder.com/300x300/f0f0f0/333?text=Day+1";
+const image2 = "https://via.placeholder.com/300x300/e8f4fd/007bff?text=Day+2";
+const image3 = "https://via.placeholder.com/300x300/fff3cd/856404?text=Day+3";
+const image4 = "https://via.placeholder.com/300x300/f8d7da/721c24?text=Day+4";
 
 const WebtoonPage = () => {
   const location = useLocation();
@@ -45,7 +46,7 @@ const WebtoonPage = () => {
       scene: cuts.cut1 || cuts.scene,
       dialogue: cuts.bubble1 || cuts.dialogue,
       mood: cuts.mood || emotion,
-      image: imageList[(prev.length) % imageList.length],
+      image: cuts.image_url || imageList[(prev.length) % imageList.length], // 🟢 백엔드 이미지 우선 사용
     };
 
     const todayExists = prev.some(item => item.id === dateStr);
@@ -66,19 +67,29 @@ const WebtoonPage = () => {
     console.log("📌 cuts 데이터 도착 확인:", cuts);
     console.log("🧾 cuts 전체 내용 확인:", JSON.stringify(cuts, null, 2));
     
-    const userCharacter = JSON.parse(localStorage.getItem("userCharacter") || "{}");
-  
-    // 사용자 캐릭터가 있으면 합성 방식 사용
-    if (userCharacter.images) {
-      const characterImage = userCharacter.images[emotion] || userCharacter.images["중립"];
-      setImageURL(characterImage);
-      return; // AI 이미지 생성 건너뛰기
+    // 🟢 백엔드에서 생성한 이미지가 있으면 우선 사용
+    if (cuts?.image_url) {
+      console.log("✅ 백엔드에서 생성한 이미지 사용:", cuts.image_url);
+      setImageURL(cuts.image_url);
+      return;
     }
 
-    const sceneText = cuts.scene || cuts.cut1;
-    const moodText = cuts.mood || emotion;
+    // 🟢 백엔드 이미지가 없을 때만 기존 로직 실행
+    const userCharacter = JSON.parse(localStorage.getItem("userCharacter") || "{}");
+    
+    // 사용자 캐릭터 이미지를 대체 이미지로 사용 (백업용)
+    if (userCharacter.images) {
+      const characterImage = userCharacter.images[emotion] || userCharacter.images["중립"];
+      console.log("⚠️ 백엔드 이미지 없음, 캐릭터 이미지 사용:", characterImage);
+      setImageURL(characterImage);
+      return;
+    }
+
+    // 마지막 대안: 새로운 이미지 생성
+    const sceneText = cuts?.scene || cuts?.cut1;
+    const moodText = cuts?.mood || emotion;
   
-    if (!sceneText) return; // 👉 최소한 cut1만 있어도 통과되게 수정됨
+    if (!sceneText) return;
   
     const fetchImage = async () => {
       const prompt = `${sceneText}를 따뜻하게 묘사한 감성 일러스트, ${moodText} 분위기`;
