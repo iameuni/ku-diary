@@ -22,3 +22,12 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
 export const auth = getAuth(app);
+
+// 🔧 디버깅을 위해 전역에서 접근 가능하도록 설정
+window.auth = auth;
+window.firebase = { auth };
+
+// 🔍 초기화 확인 로그
+console.log("🔥 Firebase 초기화 완료");
+console.log("🔐 Auth 객체:", auth);
+console.log("🌐 전역 접근: window.auth 사용 가능");
