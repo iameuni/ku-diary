@@ -1,33 +1,45 @@
-// Import the functions you need from the SDKs you need
+// frontend/src/firebase.js - 새 Firebase 프로젝트 완전한 설정
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// 🔥 새 Firebase 프로젝트 설정
 const firebaseConfig = {
-  apiKey: "AIzaSyBuGuhMEywc2uCS2RUSuh-PlBoLMvXFLXQ",
-  authDomain: "dariy-8cb5c.firebaseapp.com",
-  projectId: "dariy-8cb5c",
-  storageBucket: "dariy-8cb5c.firebasestorage.app",
-  messagingSenderId: "303050320502",
-  appId: "1:303050320502:web:95a9e4fe96fc2230930d57",
-  measurementId: "G-X8YSCMB3EQ",
+  apiKey: "AIzaSyDRC_xi6MgAxnA48i-MxSyDo4xZZ2IIPFI",
+  authDomain: "ku-diary.firebaseapp.com",
+  projectId: "ku-diary",
+  storageBucket: "ku-diary.firebasestorage.app",
+  messagingSenderId: "272723580660",
+  appId: "1:272723580660:web:2526320e9bf2560e4970a1",
+  measurementId: "G-0JYN4HBCLT"
 };
 
-// Initialize Firebase
+// Firebase 초기화
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
+// 🔥 서비스 export (Auth + Firestore)
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
-// 🔧 디버깅을 위해 전역에서 접근 가능하도록 설정
+// 🔧 전역 접근 설정 (디버깅용)
 window.auth = auth;
-window.firebase = { auth };
+window.firebase = { auth, db };
 
-// 🔍 초기화 확인 로그
-console.log("🔥 Firebase 초기화 완료");
+// 🎉 초기화 완료 로그
+console.log("🔥 새 Firebase 프로젝트 초기화 완료!");
+console.log("📋 프로젝트 ID:", firebaseConfig.projectId);
 console.log("🔐 Auth 객체:", auth);
-console.log("🌐 전역 접근: window.auth 사용 가능");
+console.log("🔥 Firestore 객체:", db);
+console.log("📊 Analytics:", analytics);
+console.log("🌐 전역 접근: window.auth, window.firebase 사용 가능");
+
+// 🔍 연결 상태 확인
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    console.log("✅ 사용자 로그인됨:", user.uid);
+  } else {
+    console.log("❌ 사용자 로그아웃 상태");
+  }
+});

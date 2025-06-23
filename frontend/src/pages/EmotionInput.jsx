@@ -1,19 +1,20 @@
-// EmotionInput.jsx - 예전 방식의 장점들 적용
+// EmotionInput.jsx - Firebase 웹툰 저장 기능을 기존 완전한 코드에 추가
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageWrapper from '../components/PageWrapper';
+import FirebaseWebtoonService from '../services/FirebaseWebtoonService';
 
 const EmotionInput = () => {
   const navigate = useNavigate();
   const [diaryText, setDiaryText] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // 예전 방식: isGenerating -> isAnalyzing
-  const [shouldNavigate, setShouldNavigate] = useState(false); // 예전 방식: 네비게이션 제어
-  const [analysisResult, setAnalysisResult] = useState(null); // 예전 방식: 결과 저장
-  const [currentStep, setCurrentStep] = useState(''); // 예전 방식: 단계별 표시
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [shouldNavigate, setShouldNavigate] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [currentStep, setCurrentStep] = useState('');
   const [userCharacter, setUserCharacter] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔄 예전 방식: useEffect로 네비게이션 처리
+  // useEffect로 네비게이션 처리
   useEffect(() => {
     if (shouldNavigate && analysisResult) {
       navigate('/webtoon', { 
@@ -34,7 +35,7 @@ const EmotionInput = () => {
     }
   }, [shouldNavigate, analysisResult, navigate, diaryText]);
 
-  // 🔄 예전 방식: 캐릭터 데이터 로드
+  // 캐릭터 데이터 로드
   const loadCharacterData = () => {
     try {
       const savedCharacter = localStorage.getItem('userCharacter');
@@ -62,10 +63,11 @@ const EmotionInput = () => {
     loadCharacterData();
   }, []);
 
-  // 🔄 예전 방식: 갤러리 저장 로직
-  const saveToGallery = (analysisData, diaryText) => {
+  // 🔥 Firebase를 사용한 새로운 갤러리 저장 로직
+  const saveToFirebaseGallery = async (analysisData, diaryText) => {
     try {
-      // 감정 이모지 매핑 (예전 방식)
+      setCurrentStep('클라우드에 저장 중...');
+      
       const emotionEmojis = {
         '기쁨': '😊',
         '슬픔': '😢',
@@ -87,7 +89,71 @@ const EmotionInput = () => {
         console.log('📸 웹툰 이미지 없음 - 캐릭터 이미지 사용:', emotion);
       }
       
-      // 예전 방식: 기존 갤러리 구조에 맞춘 데이터 생성
+      // Firebase용 웹툰 데이터 구조
+      const webtoonData = {
+        emotion: analysisData.analysis.emotion, // 이모지 없이 감정만
+        image: imageUrl,
+        inputText: diaryText,
+        scene: analysisData.story?.panels?.[0]?.scene || '',
+        dialogue: analysisData.story?.panels?.[0]?.dialogue || '',
+        summary: analysisData.analysis.summary,
+        keywords: analysisData.analysis.keywords,
+        emotion_intensity: analysisData.analysis.emotion_intensity,
+        hasWebtoonImage: !!analysisData.story?.panels?.[0]?.image_url,
+        // 추가 메타데이터
+        analysis: analysisData.analysis,
+        story: analysisData.story
+      };
+
+      // Firebase에 저장
+      const savedWebtoon = await FirebaseWebtoonService.saveWebtoon(webtoonData);
+      
+      setCurrentStep('저장 완료! 🎉');
+      console.log('🔥 Firebase 갤러리 저장 완료:', savedWebtoon.source);
+      
+      // 성공 메시지 표시
+      setTimeout(() => {
+        setCurrentStep('웹툰이 갤러리에 저장되었습니다! 📚');
+      }, 500);
+      
+      return savedWebtoon;
+    } catch (error) {
+      console.error('❌ Firebase 갤러리 저장 실패:', error);
+      setCurrentStep('로컬에 백업 저장 중...');
+      
+      // Firebase 저장 실패시 기존 로컬 저장 방식으로 폴백
+      const localResult = saveToLocalGallery(analysisData, diaryText);
+      
+      setCurrentStep('오프라인 저장 완료 📱');
+      setTimeout(() => {
+        setCurrentStep('웹툰이 로컬에 저장되었습니다! (온라인 시 동기화됩니다)');
+      }, 500);
+      
+      return localResult;
+    }
+  };
+
+  // 기존 로컬 저장 방식 (폴백용) - 원본 saveToGallery 함수
+  const saveToLocalGallery = (analysisData, diaryText) => {
+    try {
+      const emotionEmojis = {
+        '기쁨': '😊',
+        '슬픔': '😢',
+        '분노': '😡',
+        '불안': '😰',
+        '평온': '😌',
+        '중립': '🙂'
+      };
+
+      let imageUrl = analysisData.story?.panels?.[0]?.image_url;
+      
+      if (!imageUrl && userCharacter && userCharacter.images) {
+        const emotion = analysisData.analysis.emotion;
+        imageUrl = userCharacter.images[emotion] || 
+                  userCharacter.images['중립'] || 
+                  Object.values(userCharacter.images)[0];
+      }
+      
       const webtoonEntry = {
         id: Date.now(),
         date: new Date().toISOString(),
@@ -99,7 +165,8 @@ const EmotionInput = () => {
         summary: analysisData.analysis.summary,
         keywords: analysisData.analysis.keywords,
         emotion_intensity: analysisData.analysis.emotion_intensity,
-        hasWebtoonImage: !!analysisData.story?.panels?.[0]?.image_url
+        hasWebtoonImage: !!analysisData.story?.panels?.[0]?.image_url,
+        isLocalOnly: true // 로컬 전용 마크
       };
 
       const existingGallery = JSON.parse(localStorage.getItem('webtoons') || '[]');
@@ -108,21 +175,19 @@ const EmotionInput = () => {
       
       localStorage.setItem('webtoons', JSON.stringify(limitedGallery));
       
-      console.log('🖼️ 기존 갤러리에 웹툰 저장 완료:', webtoonEntry.id);
-      console.log('🎨 이미지 타입:', webtoonEntry.hasWebtoonImage ? '웹툰 장면' : '캐릭터 이미지');
+      console.log('📱 로컬 갤러리 저장 완료 (폴백):', webtoonEntry.id);
     } catch (error) {
-      console.error('❌ 갤러리 저장 실패:', error);
+      console.error('❌ 로컬 갤러리 저장도 실패:', error);
     }
   };
 
-  // 🔑 예전 방식: 메인 분석 함수 (캐릭터 처리 로직 개선)
+  // 메인 분석 함수 (기존 코드 + Firebase 저장 추가)
   const analyzeDiary = async () => {
     if (!diaryText.trim()) {
       alert('일기를 입력해주세요!');
       return;
     }
 
-    // 예전 방식: 캐릭터 상태 확인
     const hasCharacter = userCharacter && userCharacter.images;
     
     console.log('🎭 시작 - 캐릭터 유무 확인:');
@@ -130,7 +195,6 @@ const EmotionInput = () => {
     console.log('- userCharacter.images:', userCharacter?.images);
     console.log('- hasCharacter:', hasCharacter);
 
-    // 🔄 예전 방식: 캐릭터가 없으면 선택권 제공
     if (!hasCharacter) {
       console.log('⚠️ 캐릭터 없음 - 기본 웹툰 생성');
       const goToCharacterSetup = window.confirm(
@@ -148,18 +212,16 @@ const EmotionInput = () => {
     setCurrentStep('감정 분석 중...');
     
     try {
-      // 🔑 예전 방식: API 엔드포인트 선택
       const apiEndpoint = hasCharacter 
-        ? '/api/diary/analyze_with_webtoon_image'  // 캐릭터 + 장면 이미지 생성
-        : '/api/diary/analyze_with_webtoon';       // 텍스트 스토리만
+        ? '/api/diary/analyze_with_webtoon_image'
+        : '/api/diary/analyze_with_webtoon';
 
-      // 🔑 예전 방식: 캐릭터 정보 구조화 (핵심!)
       const requestBody = {
         text: diaryText,
         ...(hasCharacter && { 
           character_info: {
             description: userCharacter.description,
-            base_images: userCharacter.images  // 🔑 참고용 캐릭터 이미지들 (예전 방식)
+            base_images: userCharacter.images
           },
           user_id: localStorage.getItem('userId') || 'anonymous'
         })
@@ -187,35 +249,41 @@ const EmotionInput = () => {
       const data = await response.json();
       console.log('분석 결과:', data);
       
-      // 결과 검증
       if (!data.analysis || !data.story) {
         throw new Error('분석 결과가 올바르지 않습니다.');
       }
       
-      setCurrentStep('완료! 결과 페이지로 이동 중...');
+      setCurrentStep('Firebase에 저장 중...');
       
-      // 예전 방식: 분석 결과 저장
       setAnalysisResult(data);
       
-      // 예전 방식: 웹툰 갤러리에 저장
-      saveToGallery(data, diaryText);
+      // 🔥 Firebase 갤러리에 저장 (기존 saveToGallery 대신)
+      const savedWebtoon = await saveToFirebaseGallery(data, diaryText);
       
-      // 예전 방식: 로컬 스토리지에 저장
       localStorage.setItem('lastAnalysis', JSON.stringify({
         ...data,
         date: new Date().toISOString()
       }));
       
-      // 예전 방식: 잠시 대기 후 네비게이션 트리거
+      // 저장 결과에 따른 피드백
+      if (savedWebtoon.source === 'firebase') {
+        setCurrentStep('🎉 웹툰 생성 완료! 클라우드에 저장되었습니다');
+      } else {
+        setCurrentStep('🎉 웹툰 생성 완료! 로컬에 저장되었습니다');
+      }
+      
+      // 성공 메시지 표시 후 이동
       setTimeout(() => {
-        setShouldNavigate(true);
-      }, 500);
+        setCurrentStep('결과 페이지로 이동 중...');
+        setTimeout(() => {
+          setShouldNavigate(true);
+        }, 500);
+      }, 2000); // 2초간 성공 메시지 표시
       
     } catch (error) {
       console.error('Error:', error);
       setCurrentStep('');
       
-      // 예전 방식: 에러 처리
       if (error.message.includes('500')) {
         alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
       } else if (error.message.includes('401') || error.message.includes('402')) {
@@ -228,7 +296,7 @@ const EmotionInput = () => {
     }
   };
 
-  // 예전 방식: 변수들
+  // 변수들 (기존 코드 유지)
   const characterCount = diaryText.length;
   const maxCharacters = 1000;
   const hasCharacter = userCharacter && userCharacter.images;
@@ -243,6 +311,22 @@ const EmotionInput = () => {
     '중립': '🙂'
   };
 
+  if (loading) {
+    return (
+      <PageWrapper>
+        <div style={{ 
+          textAlign: "center", 
+          padding: "100px 20px",
+          fontSize: "18px",
+          color: "#666"
+        }}>
+          <div style={{ fontSize: "48px", marginBottom: "20px" }}>🔄</div>
+          <div>캐릭터 정보를 불러오는 중...</div>
+        </div>
+      </PageWrapper>
+    );
+  }
+
   return (
     <PageWrapper>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
@@ -253,7 +337,7 @@ const EmotionInput = () => {
           오늘 하루는 어떠셨나요? 자유롭게 작성해주세요
         </p>
 
-        {/* 🔄 예전 방식: 캐릭터 상태 표시 개선 */}
+        {/* 캐릭터 상태 표시 */}
         <div style={{
           backgroundColor: '#f8f9fa',
           padding: '20px',
@@ -315,130 +399,105 @@ const EmotionInput = () => {
                     justifyContent: 'center',
                     width: '40px',
                     height: '40px',
+                    backgroundColor: '#dee2e6',
                     borderRadius: '50%',
-                    backgroundColor: '#e9ecef',
                     fontSize: '12px',
-                    fontWeight: 'bold'
-                  }} title={`총 ${availableEmotions.length}가지 표정`}>
+                    color: '#6c757d'
+                  }}>
                     +{availableEmotions.length - 4}
                   </span>
                 )}
               </div>
+              
               <p style={{ 
+                margin: 0, 
                 fontSize: '14px', 
-                color: '#6c757d',
-                margin: 0
+                color: '#6c757d' 
               }}>
-                총 {availableEmotions.length}가지 표정으로 감정에 맞는 웹툰 생성
+                {userCharacter.description || '나만의 캐릭터'}
               </p>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '15px' }}>💭</div>
-              <h4 style={{ marginBottom: '10px', color: '#495057' }}>기본 웹툰으로 생성됩니다</h4>
-              <p style={{ color: '#6c757d', marginBottom: '20px' }}>
-                캐릭터를 만들면 일관된 모습의 개인화된 웹툰을 볼 수 있어요
+              <h3 style={{ margin: '0 0 10px 0', color: '#495057' }}>🎭 캐릭터 생성하기</h3>
+              <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: '#6c757d' }}>
+                나만의 캐릭터를 만들면 더욱 생생한 웹툰을 만들 수 있어요!
               </p>
               <button
                 onClick={() => navigate('/character-setup')}
                 style={{
-                  padding: '12px 24px',
-                  fontSize: '16px',
+                  padding: '10px 20px',
                   backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: '14px'
                 }}
               >
-                나만의 캐릭터 만들기
+                🎨 캐릭터 만들기
               </button>
             </div>
           )}
         </div>
 
-        {/* 일기 작성 영역 */}
+        {/* 일기 입력 영역 */}
         <div style={{
-          backgroundColor: 'white',
-          padding: '30px',
+          backgroundColor: '#fff',
           borderRadius: '15px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          padding: '30px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
           marginBottom: '30px'
         }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '15px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: '#333'
-          }}>
-            오늘 있었던 일, 느낀 감정들을 자유롭게 적어주세요... 예시:
-          </label>
-          
-          <div style={{
-            backgroundColor: '#f8f9fa',
-            padding: '15px',
-            borderRadius: '8px',
-            marginBottom: '15px',
-            fontSize: '14px',
-            color: '#666',
-            lineHeight: '1.6'
-          }}>
-            <p style={{ margin: '0 0 10px 0' }}>💡 <strong>작성 팁:</strong></p>
-            <ul style={{ margin: 0, paddingLeft: '20px' }}>
-              <li>오늘 친구와 카페에서 만나서 즐거운 시간을 보냈다</li>
-              <li>업무가 많아서 스트레스를 받았지만 동료들의 도움으로 잘 마쳤다</li>
-              <li>혼자 영화를 보며 여유로운 시간을 가졌다</li>
-            </ul>
-          </div>
-
           <textarea
             value={diaryText}
             onChange={(e) => setDiaryText(e.target.value)}
-            placeholder="오늘 있었던 일, 느낀 감정들을 자유롭게 적어주세요...&#10;&#10;예시:&#10;- 오늘 친구와 카페에서 만나서 오랜만에 즐거운 시간을 보냈다&#10;- 업무가 많아서 스트레스를 받았지만 동료들의 도움으로 잘 마무리했다&#10;- 혼자 영화를 보며 여유로운 시간을 가졌다"
+            placeholder={hasCharacter 
+              ? "오늘 하루 있었던 일이나 느낀 감정을 자유롭게 적어보세요. 구체적인 상황이나 대화를 포함하면 더 생생한 웹툰이 만들어져요!"
+              : "오늘 하루 있었던 일이나 느낀 감정을 자유롭게 적어보세요..."
+            }
             style={{
               width: '100%',
-              height: '300px',
+              minHeight: '300px',
               padding: '20px',
-              border: '2px solid #e9ecef',
-              borderRadius: '10px',
               fontSize: '16px',
               lineHeight: '1.6',
+              border: '1px solid #ddd',
+              borderRadius: '10px',
               resize: 'vertical',
               fontFamily: 'inherit',
-              boxSizing: 'border-box'
+              backgroundColor: 'white',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
             }}
             disabled={isAnalyzing}
-            maxLength={maxCharacters}
           />
           
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: '15px'
+            marginTop: '15px',
+            fontSize: '14px'
           }}>
-            <span style={{ 
-              fontSize: '14px', 
-              color: characterCount > maxCharacters * 0.9 ? '#dc3545' : '#666'
-            }}>
+            <span style={{ color: characterCount > maxCharacters ? '#dc3545' : '#6c757d' }}>
               {characterCount}/{maxCharacters}자
             </span>
-            <span style={{ fontSize: '14px', color: '#007bff' }}>
-              💡 구체적으로 적을수록 더 정확한 감정 분석이 가능해요
+            <span style={{ color: '#6c757d' }}>
+              💡 구체적으로 적을수록 더 정확한 분석이 가능해요
             </span>
           </div>
-        </div>
 
-        {/* 🔄 예전 방식: 웹툰 생성 버튼 */}
-        <div style={{ textAlign: 'center' }}>
           <button
             onClick={analyzeDiary}
             disabled={!diaryText.trim() || isAnalyzing || characterCount > maxCharacters}
             style={{
-              padding: '15px 40px',
+              width: '100%',
+              padding: '20px',
+              marginTop: '25px',
               fontSize: '18px',
-              backgroundColor: (!diaryText.trim() || isAnalyzing || characterCount > maxCharacters) ? '#6c757d' : '#28a745',
+              fontWeight: 'bold',
+              backgroundColor: (!diaryText.trim() || isAnalyzing || characterCount > maxCharacters) 
+                ? '#6c757d' : '#28a745',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
@@ -451,7 +510,7 @@ const EmotionInput = () => {
           </button>
         </div>
 
-        {/* 🔄 예전 방식: 로딩 섹션 */}
+        {/* 로딩 섹션 */}
         {isAnalyzing && (
           <div style={{
             marginTop: '30px',
@@ -476,6 +535,7 @@ const EmotionInput = () => {
               <p>😊 감정 상태 파악</p>
               <p>🎨 웹툰 스토리 생성</p>
               {hasCharacter && <p>🖼️ 웹툰 장면 이미지 생성</p>}
+              <p>💾 Firebase에 저장</p>
               <p>✨ 결과 정리</p>
             </div>
             <p style={{ fontSize: '14px', color: '#666' }}>
@@ -484,7 +544,7 @@ const EmotionInput = () => {
           </div>
         )}
 
-        {/* 🔄 예전 방식: 도움말 섹션 */}
+        {/* 도움말 섹션 */}
         {!isAnalyzing && (
           <div style={{
             marginTop: '30px',
@@ -499,6 +559,7 @@ const EmotionInput = () => {
               <li>구체적인 장소와 상황을 적으면 더 생생한 웹툰이 됩니다</li>
               <li>등장인물, 행동, 대화 등을 포함하면 풍부한 장면이 만들어져요</li>
               <li>매일 작성하면 나만의 웹툰 시리즈가 완성돼요</li>
+              <li>🔥 <strong>생성된 웹툰은 자동으로 클라우드에 저장되어 다른 기기에서도 확인 가능합니다!</strong></li>
             </ul>
           </div>
         )}
